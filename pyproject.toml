@@ -1,0 +1,18 @@
+[tool.poetry]
+name = "aws-es-snapshot-helper"
+version = "0.1.0"
+description = ""
+authors = ["miwpayou <miwpayou0808@gmail.com>"]
+license = "WTFPL"
+
+[tool.poetry.dependencies]
+python = "^3.9"
+requests = "^2.26.0"
+requests-aws4auth = "^1.1.1"
+
+[tool.poetry.dev-dependencies]
+boto3 = "^1.20.16"
+
+[build-system]
+requires = ["poetry-core>=1.0.0"]
+build-backend = "poetry.core.masonry.api"

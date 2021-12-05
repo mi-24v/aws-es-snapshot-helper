@@ -1,0 +1,88 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: A helper for taking snapshot of AWS OpenSearch Service
+
+Parameters:
+  LambdaVPCId:
+    Type: String
+  LambdaVPCSG:
+    Type: String
+
+Resources:
+  SnapshotBucket:
+    Type: AWS::S3::Bucket
+    Properties:
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+  SnapshotRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service: lambda.amazonaws.com
+            Action: "sts:AssumeRole"
+          - Effect: Allow
+            Principal:
+              Service: es.amazonaws.com
+            Action: "sts:AssumeRole"
+      ManagedPolicyArns:
+        - "arn:aws:iam::aws:policy/AmazonESFullAccess"
+      Policies: # 本当は自身のArnをPassRoleするPolicyも必要なのだが自己参照できないので手動で足す
+        - PolicyName: "AllowTakeElasticSearchSnapshotPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "s3:ListBucket"
+                Resource: !GetAtt SnapshotBucket.Arn
+              - Effect: Allow
+                Action:
+                  - "s3:GetObject"
+                  - "s3:PutObject"
+                  - "s3:DeleteObject"
+                Resource: !Sub "${SnapshotBucket.Arn}/*"
+        - PolicyName: "LambdaWithVPCPolicy"
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "logs:CreateLogGroup"
+                  - "logs:CreateLogStream"
+                  - "logs:PutLogEvents"
+                Resource: "arn:aws:logs:*:*:*"
+              - Effect: Allow
+                Action:
+                  - "ec2:CreateNetworkInterface"
+                  - "ec2:DescribeNetworkInterfaces"
+                  - "ec2:DetachNetworkInterface"
+                  - "ec2:DeleteNetworkInterface"
+                Resource: "*"
+
+  SnapshotHelper:
+    Type: AWS::Serverless::Function # More info about Function Resource: https://github.com/awslabs/serverless-application-model/blob/master/versions/2016-10-31.md#awsserverlessfunction
+    Properties:
+      CodeUri: snapshot_helper/
+      Handler: app.lambda_handler
+      Runtime: python3.9
+      Timeout: 100
+      Role: !GetAtt SnapshotRole.Arn
+      Environment:
+        Variables:
+          SNAPSHOT_BUCKET: !Ref SnapshotBucket
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref LambdaVPCSG
+        SubnetIds:
+          - !Ref LambdaVPCId
+
+Outputs:
+  SnapshotFunctionIamRole:
+    Description: "Implicit IAM Role created for Lambda function"
+    Value: !GetAtt SnapshotRole.Arn
