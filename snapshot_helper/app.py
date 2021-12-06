@@ -1,3 +1,4 @@
+import datetime
 import os
 
 import requests
@@ -18,7 +19,7 @@ def lambda_handler(event, context):
     if action == "register_repository":
         executor.register_repository(event["register_repository_role"], os.environ["SNAPSHOT_BUCKET"])
     elif action == "take_snapshot":
-        executor.take_snapshot(event["snapshot_name"])
+        executor.take_snapshot(event.get("snapshot_name", "snapshot-{:%Y-%m-%d_%H%M}".format(datetime.datetime.now())))
     elif action == "delete_index":
         executor.delete_index(event["index_name"])
     elif action == "restore_snapshot_one_index":
